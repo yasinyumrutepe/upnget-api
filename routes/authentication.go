@@ -8,5 +8,6 @@ import (
 
 func Authentication(api fiber.Router) {
 	api.Post("/login", controllers.Authentication{}.Login)
+	api.Post("/register", controllers.Authentication{}.Register)
 
 }

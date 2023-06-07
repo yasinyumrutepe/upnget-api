@@ -10,6 +10,6 @@ func Bid(api fiber.Router) {
 	bid := api.Group("/bid")
 	bid.Post("/", controllers.Bid{}.Store)
 	bid.Get("/product/:productid<int>", controllers.Bid{}.GetAllBidByProductID)
-	bid.Get("/user/userid<int>", controllers.Bid{}.GetAllBidByUserID)
+	bid.Get("/seller/:sellerid<int>", controllers.Bid{}.GetAllBidByUserID)
 
 }

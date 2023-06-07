@@ -12,5 +12,6 @@ func Setup(app *fiber.App) {
 	Category(api)
 	Brand(api)
 	Authentication(api)
+	Seller(api)
 
 }

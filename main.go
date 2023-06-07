@@ -19,6 +19,7 @@ func main() {
 	app.Use(cors.New(cors.Config{
 		AllowCredentials: true,
 	}))
+	app.Static("/storage", "./storage")
 
 	app.Get("/mig", func(c *fiber.Ctx) error {
 		database.Conn.DropSchema("public")

@@ -75,7 +75,8 @@ func (db *Database) Seed() error {
 
 	//DESC - All Seeds are created down in order
 	models.User{}.Seed(dbs)
-	
+	models.Category{}.Seed(dbs)
+	models.Brand{}.Seed(dbs)
 
 	//DESC - All Seeds are called down in order
 

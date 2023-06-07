@@ -20,6 +20,20 @@ type LoginInput struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
+type RegisterInput struct {
+	Name     string `json:"name"`
+	Surname  string `json:"surname"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+type UserData struct {
+	SellerName string `json:"seller_name"`
+	UserID     uint   `json:"user_id"`
+	SellerID   int    `json:"seller_id"`
+	Level      uint   `json:"level"`
+	ExpiresAt  int64  `json:"ExpiresAt"`
+	Token      string `json:"token"`
+}
 
 func GetAbilityByUserID(CaslAbilities *models.User) error {
 	//DESC - Check user is active. Get employee roles and abilities by user id
@@ -110,15 +124,14 @@ func getUserInfo(loginInput *LoginInput) (*models.Seller, error) {
 	if user.ID == 0 || err != nil {
 		return nil, errors.New("User not found or password is wrong")
 	}
-	//DESC - Check password is correct
 	// if !globals.CheckPasswordHash(user.Password, []byte(loginInput.Password)) {
-	// fmt.Printf("Invalid password!!!")
+	// 	fmt.Printf("Invalid password!!!")
 	// 	return nil, errors.New("Invalid password")
 	// }
 
 	//DESC - Get employee identification,ability,userLevel and roles by user id
 	seller.UserID = user.ID
-	err = db.Preload("User").Preload("User.UserRole").Where(&seller).First(&seller).Error
+	err = db.Preload("User").Preload("User.UserRole").Preload("Identification").Where(&seller).First(&seller).Error
 	if err != nil || seller.ID == 0 || seller.UserID == 0 {
 		return nil, errors.New("No such employee was found.")
 	}
@@ -159,6 +172,7 @@ func (Authentication) Login(c *fiber.Ctx) error {
 		"product":     "auction",
 		"ExpiresAt":   tokenTime.Unix(), //Data in Env
 	})
+
 	var token string
 	//DESC - Token secret key
 	token, err = claims.SignedString([]byte(secret.Env["JWT"].(map[string]any)["secret"].(string)))
@@ -168,8 +182,102 @@ func (Authentication) Login(c *fiber.Ctx) error {
 			Message: "Error while creating token",
 		})
 	}
+	sellerData := UserData{
+		SellerName: seller.Identification.Name + " " + seller.Identification.Surname,
+		UserID:     seller.User.ID,
+		SellerID:   seller.ID,
+		Level:      seller.User.Level,
+		ExpiresAt:  tokenTime.Unix(),
+		Token:      token,
+	}
+
 	return c.Status(fiber.StatusOK).JSON(globals.Response{
-		Body:    map[string]interface{}{"token": token, "user_ability": seller.User.CaslAbilities},
+		Body:    sellerData,
 		Message: "Login success",
 	})
+}
+
+func (Authentication) Register(c *fiber.Ctx) error {
+	//seller register
+	var registerInput RegisterInput
+	if err := c.BodyParser(&registerInput); err != nil {
+		c.Status(fiber.StatusBadRequest)
+		return c.Status(fiber.StatusBadRequest).JSON(globals.Response{
+			Error:   true,
+			Message: "Invalid request",
+		})
+	}
+	//DESC - Check validation for email
+	validateError := []map[string]interface{}{}
+	validateError = globals.ValidateStruct(registerInput)
+	if len(validateError) > 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(globals.Response{
+			Error:   true,
+			Body:    validateError,
+			Message: "Invalid request",
+		})
+	}
+
+	//DESC - Check user is exist
+	user := models.User{Email: registerInput.Email}
+	err := database.Conn.DB.Where(&user).First(&user).Error
+	if user.ID != 0 || err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(globals.Response{
+			Error:   true,
+			Message: "User already exist",
+		})
+	}
+
+	pass, err := models.HashPassword([]byte(registerInput.Password))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(globals.Response{
+			Error:   true,
+			Message: "Password could not be created",
+		})
+	}
+
+	//DESC - Create user
+	user = models.User{
+		Email:    registerInput.Email,
+		Password: pass,
+		Level:    1,
+	}
+	err = database.Conn.DB.Create(&user).Error
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(globals.Response{
+			Error:   true,
+			Message: "User could not be created",
+		})
+	}
+
+	//DESC - Create identification
+	identification := models.Identification{
+		SellerID: user.ID,
+		Name:     registerInput.Name,
+		Surname:  registerInput.Surname,
+	}
+	err = database.Conn.DB.Create(&identification).Error
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(globals.Response{
+			Error:   true,
+			Message: "Identification could not be created",
+		})
+	}
+	//DESC - Create seller
+	seller := models.Seller{
+		UserID:         user.ID,
+		Identification: identification,
+	}
+	err = database.Conn.DB.Create(&seller).Error
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(globals.Response{
+			Error:   true,
+			Message: "Seller could not be created",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(globals.Response{
+		Message: "Register success",
+	})
+
 }

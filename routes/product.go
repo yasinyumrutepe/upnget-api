@@ -9,7 +9,9 @@ import (
 func Product(api fiber.Router) {
 	api = api.Group("/product")
 	api.Get("/", controllers.Product{}.ProductGetAll)
-	api.Get("/:id", controllers.Product{}.ProductGetID)
+	api.Get("/category/:name<string>", controllers.Product{}.ProductGetAll)
+	api.Get("/seller/:sellerid<uint>", controllers.Product{}.ProductGetAllBySellerID)
+	api.Get("/:id<uint>", controllers.Product{}.ProductGetID)
 	api.Post("/", controllers.Product{}.ProductStore)
 	api.Put("/", controllers.Product{}.ProductUpdate)
 
